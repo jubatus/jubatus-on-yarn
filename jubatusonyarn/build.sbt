@@ -7,7 +7,7 @@ name := "JubatusOnYARN"
 
 val ORGNIZATION = "us.jubat"
 val SCALA_VERSION = "2.10.4"
-val VERSION = "1.0+dev"
+val VERSION = "1.1"
 
 val JUBATUS_DEPENDENCIES = Seq(
   ("us.jubat" % "jubatus" % "0.7.1").exclude("org.jboss.netty", "netty"),

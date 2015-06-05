@@ -86,7 +86,7 @@ The base path (/jubatus-on-yarn) can be configured when calling the start() meth
     ```
     $ ./sbt "project jubatus-on-yarn-application-master" assembly
     $ hadoop fs -copyFromLocal \
-    ./jubatus-on-yarn-application-master/target/scala-2.10/jubatus-on-yarn-application-master0.1-SNAPSHOT.jar \
+    ./jubatus-on-yarn-application-master/target/scala-2.10/jubatus-on-yarn-application-master1.1.jar \
     /jubatus-on-yarn/application-master/jubatus-on-yarn-application-master.jar
     ```
 
@@ -107,7 +107,7 @@ The base path (/jubatus-on-yarn) can be configured when calling the start() meth
     ```
     $ ./sbt "project jubatus-on-yarn-container" assembly
     $ hadoop fs -copyFromLocal \
-    ./jubatus-on-yarn-container/target/scala-2.10/jubatus-on-yarn-container0.1-SNAPSHOT.jar \
+    ./jubatus-on-yarn-container/target/scala-2.10/jubatus-on-yarn-container1.1.jar \
     /jubatus-on-yarn/container/jubatus-on-yarn-container.jar
     ```
 
@@ -149,7 +149,7 @@ $ hadoop fs -copyFromLocal ./jubatus-example/shogun/shogun.json /jubatus-on-yarn
 ### Run the Example Application
 
 ```
-$ hadoop jar ./jubatus-on-yarn-test/target/scala-2.10/jubatus-on-yarn-test0.1-SNAPSHOT.jar us.jubat.yarn.test.Test9
+$ hadoop jar ./jubatus-on-yarn-test/target/scala-2.10/jubatus-on-yarn-test1.1.jar us.jubat.yarn.test.Test9
 ```
 
 Via YARN, jubaclassifier_proxy  and jubaclassifier are started.
@@ -177,8 +177,8 @@ When running `./sbt publishLocal`, the client code will be packaged and publishe
 Then add the following lines to your project's libraryDependencies:
 
 ```
-"us.jubat" %% "jubatus-on-yarn-client"  % "0.1-SNAPSHOT",
-"us.jubat" %% "jubatus-on-yarn-common"  % "0.1-SNAPSHOT"
+"us.jubat" %% "jubatus-on-yarn-client"  % "1.1",
+"us.jubat" %% "jubatus-on-yarn-common"  % "1.1"
 ```
 
 ### How to Execute Your Program
