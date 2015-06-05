@@ -7,10 +7,10 @@ name := "JubatusOnYARN"
 
 val ORGNIZATION = "us.jubat"
 val SCALA_VERSION = "2.10.4"
-val VERSION = "1.0"
+val VERSION = "1.1"
 
 val JUBATUS_DEPENDENCIES = Seq(
-  ("us.jubat" % "jubatus" % "0.6.0").exclude("org.jboss.netty", "netty"),
+  ("us.jubat" % "jubatus" % "0.7.1").exclude("org.jboss.netty", "netty"),
   "org.apache.hadoop" % "hadoop-common" % "2.3.0-cdh5.1.3" % "provided",
   "org.apache.hadoop" % "hadoop-hdfs" % "2.3.0-cdh5.1.3" % "provided",
   "org.apache.hadoop" % "hadoop-yarn-client" % "2.3.0-cdh5.1.3" % "provided"

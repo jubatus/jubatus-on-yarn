@@ -86,7 +86,7 @@ $ sudo service hadoop-yarn-nodemanager restart
     ```
     $ ./sbt "project jubatus-on-yarn-application-master" assembly
     $ hadoop fs -copyFromLocal \
-    ./jubatus-on-yarn-application-master/target/scala-2.10/jubatus-on-yarn-application-master0.1-SNAPSHOT.jar \
+    ./jubatus-on-yarn-application-master/target/scala-2.10/jubatus-on-yarn-application-master1.1.jar \
     /jubatus-on-yarn/application-master/jubatus-on-yarn-application-master.jar
     ```
 
@@ -107,7 +107,7 @@ $ sudo service hadoop-yarn-nodemanager restart
     ```
     $ ./sbt "project jubatus-on-yarn-container" assembly
     $ hadoop fs -copyFromLocal \
-    ./jubatus-on-yarn-container/target/scala-2.10/jubatus-on-yarn-container0.1-SNAPSHOT.jar \
+    ./jubatus-on-yarn-container/target/scala-2.10/jubatus-on-yarn-container1.1.jar \
     /jubatus-on-yarn/container/jubatus-on-yarn-container.jar
     ```
 
@@ -149,7 +149,7 @@ $ hadoop fs -copyFromLocal ./jubatus-example/shogun/shogun.json /jubatus-on-yarn
 #### サンプルアプリケーションの実行
 
 ```
-$ hadoop jar ./jubatus-on-yarn-test/target/scala-2.10/jubatus-on-yarn-test0.1-SNAPSHOT.jar us.jubat.yarn.test.Test9
+$ hadoop jar ./jubatus-on-yarn-test/target/scala-2.10/jubatus-on-yarn-test1.1.jar us.jubat.yarn.test.Test9
 ```
 
 YARN により、いずれかのノードで jubaclassifier_proxy、jubaclassifier が起動します。
@@ -177,8 +177,8 @@ jubatus-on-yarn-test/src/main/scala/us/jubat/yarn/test/Test9.scala
 プロジェクトの libraryDependencies に次の依存関係を追加してください。
 
 ```
-"us.jubat" %% "jubatus-on-yarn-client"  % "0.1-SNAPSHOT",
-"us.jubat" %% "jubatus-on-yarn-common"  % "0.1-SNAPSHOT"
+"us.jubat" %% "jubatus-on-yarn-client"  % "1.1",
+"us.jubat" %% "jubatus-on-yarn-common"  % "1.1"
 ```
 
 ### 実行方法
