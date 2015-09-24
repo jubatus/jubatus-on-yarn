@@ -15,7 +15,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 package us.jubat.yarn.client
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{Path, FileSystem}
 import scala.concurrent.Future
 import scala.util.{Success, Failure, Try}
 import java.net.InetAddress
@@ -23,6 +23,7 @@ import us.jubat.yarn.common._
 import scala.Some
 import us.jubat.yarn.client.JubatusYarnApplication.ApplicationContext
 import org.apache.hadoop.yarn.api.records.{FinalApplicationStatus, ApplicationReport}
+import org.apache.hadoop.yarn.conf.YarnConfiguration
 
 // TODO ExecutionContextをとりあえず追加。これで問題ないかあとで確認。
 
@@ -222,6 +223,24 @@ class JubatusYarnApplication(val jubatusProxy: Location, val jubatusServers: Lis
    */
   def loadModel(aModelPathPrefix: Path, aModelId: String): Try[JubatusYarnApplication] = Try {
     logger.info(s"loadModel $aModelPathPrefix, $aModelId")
+
+    val tHdfs = FileSystem.get(new YarnConfiguration())
+    val srcPath = new Path(aModelPathPrefix, aModelId)
+    if (!tHdfs.exists(srcPath)) {
+      val msg = s"model path does not exist ($srcPath)"
+      logger.error(msg)
+      throw new RuntimeException(msg)
+    }
+
+    for (i <- 0 to jubatusServers.size - 1) {
+      val srcFile = new Path(srcPath, s"$i.jubatus")
+      if (!tHdfs.exists(srcFile)) {
+        val msg = s"model file does not exist ($srcFile)"
+        logger.error(msg)
+        throw new RuntimeException(msg)
+      }
+    }
+
     aContext.controller.loadModel(aModelPathPrefix, aModelId)
     this
   }
