@@ -100,21 +100,24 @@ class ContainerController(name: String, seq: Int, applicationMasterLocation: Loc
 
     val tLocalPathString = s"${tIpPort}_${tType}_$aId.jubatus"
 
-    // CRCファイルが存在する場合は削除する。
-    {
-      val tCRC = new File(tDir, s".$tLocalPathString.crc")
-      if(tCRC.exists()) tCRC.delete()
-    }
+    try {
+      // CRCファイルが存在する場合は削除する。
+      {
+        val tCRC = new File(tDir, s".$tLocalPathString.crc")
+        if(tCRC.exists()) tCRC.delete()
+      }
 
-    // ローカルファイルをコピー
-    {
-      val tHdfs = FileSystem.get(new YarnConfiguration())
-      val tFromLocal = new Path(tDir, tLocalPathString)
-      val tToHdfs = new Path(aPathPrefix, s"$aId/$seq.jubatus")
-      tHdfs.copyFromLocalFile(true, true, tFromLocal, tToHdfs)
+      // ローカルファイルをコピー
+      {
+        val tHdfs = FileSystem.get(new YarnConfiguration())
+        val tFromLocal = new Path(tDir, tLocalPathString)
+        val tToHdfs = new Path(aPathPrefix, s"$aId/$seq.jubatus")
+        tHdfs.copyFromLocalFile(true, true, tFromLocal, tToHdfs)
+      }
+    } finally {
+      mStatus = ControllerStatus.Wait
+      logger.debug(s"save: mStatus:$mStatus")
     }
-
-    mStatus = ControllerStatus.Wait
   }
 
   /**
