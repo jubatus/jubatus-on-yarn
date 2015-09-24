@@ -130,9 +130,13 @@ class ContainerController(name: String, seq: Int, applicationMasterLocation: Loc
   def load(aPathPrefix: String, aId: String): Unit = {
     requireState(mStatus == ControllerStatus.Wait)
     mStatus = ControllerStatus.Loading
-    val (tIpPort, tDir, tType) = getJubatusConfig
-    FileSystem.get(new YarnConfiguration()).copyToLocalFile(false, new Path(aPathPrefix, s"$aId/$seq.jubatus"), new Path(tDir, s"${tIpPort}_${tType}_$aId.jubatus"))
-    mStatus = ControllerStatus.Wait
+    try {
+      val (tIpPort, tDir, tType) = getJubatusConfig
+      FileSystem.get(new YarnConfiguration()).copyToLocalFile(false, new Path(aPathPrefix, s"$aId/$seq.jubatus"), new Path(tDir, s"${tIpPort}_${tType}_$aId.jubatus"))
+    } finally {
+      mStatus = ControllerStatus.Wait
+      logger.debug(s"load: mStatus:$mStatus")
+    }
   }
 
   /**
