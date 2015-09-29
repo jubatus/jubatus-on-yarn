@@ -51,14 +51,11 @@ class DefaultYarnClient extends YarnClient with HasLogger {
   private def jubaConfigBasePath(aBasePath: Path): Path = new Path(aBasePath, "application-master/jubaconfig")
 
   private val jubaConfigName: String = "jubaconfig.json"
-  private val jubaProxyMemory: Int = 32
 
   private def applicationMasterJarPath(aBasePath: Path): Path = new Path(aBasePath, "application-master/jubatus-on-yarn-application-master.jar")
 
   private val applicationMasterJarName: String = "jubatus-on-yarn-application-master.jar"
   private val applicationMasterMainClass: String = "us.jubat.yarn.applicationmaster.ApplicationMasterApp"
-  private val applicationMasterMemory: Int = 128
-  private val applicationMasterVirtualCores: Int = 1
 
   private val mYarnConfig = new YarnConfiguration()
   private val mYarnClient = {
@@ -122,12 +119,22 @@ class DefaultYarnClient extends YarnClient with HasLogger {
       case LearningMachineType.Anomaly => "anomaly"
       case LearningMachineType.Recommender => "recommender"
     }
+
+    var containerNodes: String = """\"\""""
+    if (aResource.containerNodes != null) {
+      containerNodes = s"""\"${aResource.containerNodes.mkString(",")}\""""
+    }
+    var containerRacks: String = """\"\""""
+    if (aResource.containerRacks != null) {
+      containerRacks = s"""\"${aResource.containerRacks.mkString(",")}\""""
+    }
+
     val tCommand = (
       s"bash $entryScriptName"
         // ApplicationMaster の jar 起動用 java コマンド
         + s" $applicationMasterJarName"
         + s" $applicationMasterMainClass"
-        + s" $applicationMasterMemory"
+        + s" ${aResource.masterMemory}"
 
         // ApplicationMaster
         + s" $aApplicationName" // --application-name
@@ -137,6 +144,9 @@ class DefaultYarnClient extends YarnClient with HasLogger {
         + s" ${aResource.priority}" // --priority
         + s" ${aResource.memory}" // --memory
         + s" ${aResource.virtualCores}" // --virtual-cores
+        + s" ${aResource.containerMemory}" // --container-memory
+        + s" ${containerNodes}" // --container-nodes
+        + s" ${containerRacks}" // --container-racks
 
         // ApplicationMaster, juba*_proxy, jubaconfig
         + s" $aLearningMachineInstanceName" // --learning-machine-name / --name
@@ -155,8 +165,8 @@ class DefaultYarnClient extends YarnClient with HasLogger {
 
     // リソース
     val tResource = Records.newRecord(classOf[YarnResource])
-    tResource.setMemory(jubaProxyMemory + applicationMasterMemory)
-    tResource.setVirtualCores(applicationMasterVirtualCores)
+    tResource.setMemory(aResource.proxyMemory + aResource.masterMemory)
+    tResource.setVirtualCores(aResource.masterCores)
 
     // Application Master 登録
     val tApplication = mYarnClient.createApplication()

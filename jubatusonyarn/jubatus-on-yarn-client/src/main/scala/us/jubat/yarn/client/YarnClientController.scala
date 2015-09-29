@@ -47,7 +47,11 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   }
 
   def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path): ApplicationMasterProxy = {
-    val tFullName = getFullName(aName, aLearningMachineType, aZookeepers)
+    startJubatusApplication(aName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, aBasePath, null)
+  }
+
+  def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path, aApplicationName: String): ApplicationMasterProxy = {
+    val tFullName = Option(aApplicationName).getOrElse(getFullName(aName, aLearningMachineType, aZookeepers))
     logger.info(s"starting $tFullName")
 
     val tApplicationId = yarnClient.submitApplicationMaster(tFullName, aName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, location, aBasePath)
@@ -56,7 +60,11 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   }
 
   def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path): ApplicationMasterProxy = {
-    val tFullName = getFullName(aName, aLearningMachineType, aZookeepers)
+    startJubatusApplication(aName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, aBasePath, null)
+  }
+
+  def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path, aApplicationName: String): ApplicationMasterProxy = {
+    val tFullName = Option(aApplicationName).getOrElse(getFullName(aName, aLearningMachineType, aZookeepers))
     logger.info(s"starting $tFullName")
 
     val tApplicationId = yarnClient.submitApplicationMaster(tFullName, aName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, location, aBasePath)

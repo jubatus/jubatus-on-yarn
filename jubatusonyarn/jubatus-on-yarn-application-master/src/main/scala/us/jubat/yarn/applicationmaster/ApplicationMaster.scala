@@ -38,7 +38,6 @@ class ApplicationMaster extends HasLogger {
   private def containerJarPath(aBasePath: Path): Path = new Path(aBasePath, "container/jubatus-on-yarn-container.jar")
   private val containerJarName: String = "jubatus-on-yarn-container.jar"
   private val containerMainClass: String = "us.jubat.yarn.container.ContainerApp"
-  private val containerMemory: Int = 128
 
   private val mYarnConfig = new YarnConfiguration()
 
@@ -56,8 +55,17 @@ class ApplicationMaster extends HasLogger {
     tPriority.setPriority(aParams.priority)
 
     val tResource = Records.newRecord(classOf[Resource])
-    tResource.setMemory(aParams.memory + containerMemory)
+    tResource.setMemory(aParams.memory + aParams.containerMemory)
     tResource.setVirtualCores(aParams.virtualCores)
+
+    var containerNodes: Array[String] = null
+    var containerRacks: Array[String] = null
+    if (!aParams.containerNodes.isEmpty()) {
+      containerNodes = aParams.containerNodes.split(",").toArray[String]
+    }
+    if (!aParams.containerRacks.isEmpty()) {
+      containerRacks = aParams.containerRacks.split(",").toArray[String]
+    }
 
     // コンテナを起動
     (1 to aParams.nodes).foreach { _ =>
@@ -67,7 +75,7 @@ class ApplicationMaster extends HasLogger {
         + s"\tmemory: ${tResource.getMemory}\n"
         + s"\tvirtualCores: ${tResource.getVirtualCores}"
       )
-      tResourceManager.addContainerRequest(new ContainerRequest(tResource, null, null, tPriority))
+      tResourceManager.addContainerRequest(new ContainerRequest(tResource, containerNodes, containerRacks, tPriority))
     }
 
     // コンテナの終了を待機
@@ -140,7 +148,7 @@ class ApplicationMaster extends HasLogger {
           s"bash $entryScriptName"
             + s" $containerJarName"
             + s" $containerMainClass"
-            + s" $containerMemory"
+            + s" ${aParams.containerMemory}"
 
             // jar にわたす
             + s" ${aParams.applicationName}"  // --application-name

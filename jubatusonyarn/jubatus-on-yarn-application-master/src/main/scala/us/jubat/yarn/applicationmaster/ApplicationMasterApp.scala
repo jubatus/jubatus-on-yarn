@@ -118,6 +118,15 @@ class ApplicationMasterParams {
   @org.kohsuke.args4j.Option(name = "--virtual-cores")
   var virtualCores: Int = 1
 
+  @org.kohsuke.args4j.Option(name = "--container-memory")
+  var containerMemory: Int = 128
+
+  @org.kohsuke.args4j.Option(name = "--container-nodes")
+  var containerNodes: String = ""
+
+  @org.kohsuke.args4j.Option(name = "--container-racks")
+  var containerRacks: String = ""
+
 
   @org.kohsuke.args4j.Option(name = "--learning-machine-name")
   var learningMachineName: String = ""
