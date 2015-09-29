@@ -15,7 +15,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 package us.jubat.yarn.client
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{Path, FileSystem}
 import scala.concurrent.Future
 import scala.util.{Success, Failure, Try}
 import java.net.InetAddress
@@ -23,13 +23,25 @@ import us.jubat.yarn.common._
 import scala.Some
 import us.jubat.yarn.client.JubatusYarnApplication.ApplicationContext
 import org.apache.hadoop.yarn.api.records.{FinalApplicationStatus, ApplicationReport}
+import org.apache.hadoop.yarn.conf.YarnConfiguration
 
 // TODO ExecutionContextをとりあえず追加。これで問題ないかあとで確認。
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
-case class Resource(priority: Int, memory: Int, virtualCores: Int)
+object Resource {
+  val defaultMasterMemory: Int = 128
+  val defaultJubatusProxyMemory: Int = 32
+  val defaultMasterCores: Int = 1
+  val defaultPriority: Int = 0
+  val defaultContainerMemory: Int = 128
+  val defaultJubatusServerMemory: Int = 256
+  val defaultContainerCores: Int = 1
+}
+case class Resource(priority: Int = Resource.defaultPriority, memory: Int = Resource.defaultJubatusServerMemory,
+    virtualCores: Int = Resource.defaultContainerCores, masterMemory: Int = Resource.defaultMasterMemory,
+    proxyMemory: Int = Resource.defaultJubatusProxyMemory, masterCores: Int = Resource.defaultMasterCores,
+    containerMemory: Int = Resource.defaultContainerMemory, containerNodes: List[String] = null, containerRacks: List[String] = null)
 
 case class JubatusYarnApplicationStatus(jubatusProxy: java.util.Map[String, java.util.Map[String, String]], jubatusServers: java.util.Map[String, java.util.Map[String, String]], yarnApplication: ApplicationReport)
 
@@ -85,7 +97,26 @@ object JubatusYarnApplication extends HasLogger {
    * @return  [[JubatusYarnApplication]]
    */
   def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int): Future[JubatusYarnApplication] = {
-    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, new Path("hdfs:///jubatus-on-yarn"))
+    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, new Path("hdfs:///jubatus-on-yarn"), null)
+  }
+
+  /**
+   * JubatusYarnApplication を起動します。
+   *
+   * juba${aLearningMachineType_proxy} がひとつ, juba${aLearningMachineType} が ${aNodeCount} だけ起動します。
+   * 各 juba${aLearningMachineType} の使用するリソースを ${aResource} に指定してください。
+   *
+   * @param aLearningMachineName  learning machine name
+   * @param aLearningMachineType  learning machine type
+   * @param aZookeepers ZooKeeper locations
+   * @param aConfigString config json string
+   * @param aResource  computer resources in the cluster
+   * @param aNodeCount  number of cluster
+   * @param aApplicationName yarn-application name
+   * @return  [[JubatusYarnApplication]]
+   */
+  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aApplicationName: String): Future[JubatusYarnApplication] = {
+    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, new Path("hdfs:///jubatus-on-yarn"), aApplicationName)
   }
 
   /**
@@ -103,7 +134,27 @@ object JubatusYarnApplication extends HasLogger {
    * @param aBasePath base path of jar and sh files
    * @return  [[JubatusYarnApplication]]
    */
-  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path): Future[JubatusYarnApplication] = Future {
+  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path): Future[JubatusYarnApplication] = {
+    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, aBasePath, null)
+  }
+
+  /**
+   * JubatusYarnApplication を起動します。
+   *
+   * juba${aLearningMachineType_proxy} がひとつ, juba${aLearningMachineType} が ${aNodeCount} だけ起動します。
+   * 各 juba${aLearningMachineType} の使用するリソースを ${aResource} に指定してください。
+   *
+   * @param aLearningMachineName  learning machine name
+   * @param aLearningMachineType  learning machine type
+   * @param aZookeepers ZooKeeper locations
+   * @param aConfigString config json string
+   * @param aResource  computer resources in the cluster
+   * @param aNodeCount  number of cluster
+   * @param aBasePath base path of jar and sh files
+   * @param aApplicationName yarn-application name
+   * @return  [[JubatusYarnApplication]]
+   */
+  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path, aApplicationName: String): Future[JubatusYarnApplication] = Future {
     require(aResource.memory > 0, "specify memory than 1MB.")
     require(aNodeCount > 0, "specify node count than 1")
 
@@ -114,8 +165,8 @@ object JubatusYarnApplication extends HasLogger {
       case None => throw new IllegalStateException("Service not running.")
       case Some(tYarnClientController) =>
         // ApplicationMaster 起動
-        logger.info(s"startJubatusApplication $aLearningMachineName, $aLearningMachineType, $aZookeepers, $aConfigString, $aResource, $aNodeCount")
-        val tApplicationMasterProxy = tYarnClientController.startJubatusApplication(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, aBasePath)
+        logger.info(s"startJubatusApplication $aLearningMachineName, $aLearningMachineType, $aZookeepers, $aConfigString, $aResource, $aNodeCount, $aApplicationName")
+        val tApplicationMasterProxy = tYarnClientController.startJubatusApplication(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, aBasePath, aApplicationName)
         waitForStarted(ApplicationContext(tYarnClientController, tApplicationMasterProxy, tService))
     }
   }
@@ -135,7 +186,26 @@ object JubatusYarnApplication extends HasLogger {
    * @return  [[JubatusYarnApplication]]
    */
   def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int): Future[JubatusYarnApplication] = {
-    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, new Path("hdfs:///jubatus-on-yarn"))
+    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, new Path("hdfs:///jubatus-on-yarn"), null)
+  }
+
+  /**
+   * JubatusYarnApplication を起動します。
+   *
+   * juba${aLearningMachineType_proxy} がひとつ, juba${aLearningMachineType} が ${aNodeCount} だけ起動します。
+   * 各 juba${aLearningMachineType} の使用するリソースを ${aResource} に指定してください。
+   *
+   * @param aLearningMachineName  learning machine name
+   * @param aLearningMachineType  learning machine type
+   * @param aZookeepers ZooKeeper locations
+   * @param aConfigFile config file
+   * @param aResource  computer resources in the cluster
+   * @param aNodeCount  number of cluster
+   * @param aApplicationName yarn-application name
+   * @return  [[JubatusYarnApplication]]
+   */
+  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aApplicationName: String): Future[JubatusYarnApplication] = {
+    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, new Path("hdfs:///jubatus-on-yarn"), aApplicationName)
   }
 
   /**
@@ -152,7 +222,26 @@ object JubatusYarnApplication extends HasLogger {
    * @param aNodeCount  number of cluster
    * @return  [[JubatusYarnApplication]]
    */
-  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path): Future[JubatusYarnApplication] = Future {
+  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path): Future[JubatusYarnApplication] = {
+    start(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, aBasePath,  null)
+  }
+
+  /**
+   * JubatusYarnApplication を起動します。
+   *
+   * juba${aLearningMachineType_proxy} がひとつ, juba${aLearningMachineType} が ${aNodeCount} だけ起動します。
+   * 各 juba${aLearningMachineType} の使用するリソースを ${aResource} に指定してください。
+   *
+   * @param aLearningMachineName  learning machine name
+   * @param aLearningMachineType  learning machine type
+   * @param aZookeepers ZooKeeper locations
+   * @param aConfigFile config file
+   * @param aResource  computer resources in the cluster
+   * @param aNodeCount  number of cluster
+   * @param aApplicationName yarn-application name
+   * @return  [[JubatusYarnApplication]]
+   */
+  def start(aLearningMachineName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path, aApplicationName: String): Future[JubatusYarnApplication] = Future {
     require(aResource.memory > 0, "specify memory than 1MB.")
     require(aNodeCount > 0, "specify node count than 1")
 
@@ -163,8 +252,8 @@ object JubatusYarnApplication extends HasLogger {
       case None => throw new IllegalStateException("Service not running.")
       case Some(tYarnClientController) =>
         // ApplicationMaster 起動
-        logger.info(s"startJubatusApplication $aLearningMachineName, $aLearningMachineType, $aZookeepers, $aConfigFile, $aResource, $aNodeCount")
-        val tApplicationMasterProxy = tYarnClientController.startJubatusApplication(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, aBasePath)
+        logger.info(s"startJubatusApplication $aLearningMachineName, $aLearningMachineType, $aZookeepers, $aConfigFile, $aResource, $aNodeCount, $aApplicationName")
+        val tApplicationMasterProxy = tYarnClientController.startJubatusApplication(aLearningMachineName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, aBasePath, aApplicationName)
         waitForStarted(ApplicationContext(tYarnClientController, tApplicationMasterProxy, tService))
     }
   }
@@ -222,6 +311,24 @@ class JubatusYarnApplication(val jubatusProxy: Location, val jubatusServers: Lis
    */
   def loadModel(aModelPathPrefix: Path, aModelId: String): Try[JubatusYarnApplication] = Try {
     logger.info(s"loadModel $aModelPathPrefix, $aModelId")
+
+    val tHdfs = FileSystem.get(new YarnConfiguration())
+    val srcPath = new Path(aModelPathPrefix, aModelId)
+    if (!tHdfs.exists(srcPath)) {
+      val msg = s"model path does not exist ($srcPath)"
+      logger.error(msg)
+      throw new RuntimeException(msg)
+    }
+
+    for (i <- 0 to jubatusServers.size - 1) {
+      val srcFile = new Path(srcPath, s"$i.jubatus")
+      if (!tHdfs.exists(srcFile)) {
+        val msg = s"model file does not exist ($srcFile)"
+        logger.error(msg)
+        throw new RuntimeException(msg)
+      }
+    }
+
     aContext.controller.loadModel(aModelPathPrefix, aModelId)
     this
   }
