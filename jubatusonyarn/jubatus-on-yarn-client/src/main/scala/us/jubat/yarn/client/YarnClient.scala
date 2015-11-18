@@ -31,9 +31,9 @@ import scala.collection.JavaConverters._
 import scala.io.Source
 
 trait YarnClient {
-  def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId
+  def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeeper: String, aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId
 
-  def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId
+  def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeeper: String, aConfigFile: Path, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId
 
   def getStatus(aApplicationId: ApplicationId): ApplicationReport
 
@@ -79,7 +79,7 @@ class DefaultYarnClient extends YarnClient with HasLogger {
     tResource
   }
 
-  override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
+  override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeeper: String, aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
     val tHdfsPath = new Path(jubaConfigBasePath(aBasePath), s"${aApplicationName.replaceAll(":", "_")}.json")
 
     val tTempFile = File.createTempFile(s"jubatus-on-yarn-server", ".json")
@@ -89,12 +89,12 @@ class DefaultYarnClient extends YarnClient with HasLogger {
 
     FileSystem.get(mYarnConfig).copyFromLocalFile(true, true, new Path(tTempFile.getPath), tHdfsPath)
 
-    submitApplicationMaster(aApplicationName, aLearningMachineInstanceName, aLearningMachineType, aZookeepers, tHdfsPath, aResource, aNodes, aManagementLocation, aBasePath)
+    submitApplicationMaster(aApplicationName, aLearningMachineInstanceName, aLearningMachineType, aZookeeper, tHdfsPath, aResource, aNodes, aManagementLocation, aBasePath)
   }
 
 
-  override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
-    logger.info(s"call submitApplicationMaster($aApplicationName, $aLearningMachineInstanceName, $aLearningMachineType, $aZookeepers, $aConfigFile, $aResource, $aNodes, $aManagementLocation)")
+  override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeeper: String, aConfigFile: Path, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
+    logger.info(s"call submitApplicationMaster($aApplicationName, $aLearningMachineInstanceName, $aLearningMachineType, $aZookeeper, $aConfigFile, $aResource, $aNodes, $aManagementLocation)")
     val tApplicationMasterContext = Records.newRecord(classOf[ContainerLaunchContext])
 
     tApplicationMasterContext.setLocalResources(
@@ -141,7 +141,7 @@ class DefaultYarnClient extends YarnClient with HasLogger {
         // ApplicationMaster, juba*_proxy, jubaconfig
         + s" $aLearningMachineInstanceName" // --learning-machine-name / --name
         + s" ${typeToString(aLearningMachineType)}" // --learning-machine-type / juba{}_proxy
-        + s" ${aZookeepers.map { z => s"${z.hostAddress}:${z.port}"}.mkString(",")}" // --zookeeper / --zookeeper
+        + s" ${aZookeeper}" // --zookeeper / --zookeeper
 
         // jubaconfig
         + s" $jubaConfigName" // -file
