@@ -16,10 +16,11 @@
 package us.jubat.yarn.client
 
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.yarn.api.records.{FinalApplicationStatus, ApplicationReport, ApplicationId}
+import org.apache.hadoop.yarn.api.records.{ApplicationId, FinalApplicationStatus}
 import us.jubat.common.ClientBase
 import us.jubat.yarn.common.Predef._
 import us.jubat.yarn.common._
+
 import scala.util.Try
 
 /**
@@ -37,8 +38,8 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   private var mApplicationMaster: Option[ApplicationMasterProxy] = None
   private var mClient: Option[ClientBase] = None
 
-  private def getFullName(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location]): String = {
-    s"$aName:${aLearningMachineType.name}:${aZookeepers.map(z => z.hostAddress + ":" + z.port).mkString(",")}"
+  private def createDefaultApplicationName(aConfig: JubatusClusterConfiguration): String = {
+    s"${aConfig.learningMachineName}:${aConfig.learningMachineType.name}:${aConfig.zookeeper}"
   }
 
   private def registerApplication(aFullName: String, aApplicationId: ApplicationId, aNodeCount: Int): ApplicationMasterProxy = {
@@ -46,22 +47,47 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
     mApplicationMaster.get
   }
 
-  def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path): ApplicationMasterProxy = {
-    val tFullName = getFullName(aName, aLearningMachineType, aZookeepers)
-    logger.info(s"starting $tFullName")
+  def startJubatusApplication(aConfig: JubatusClusterConfiguration): ApplicationMasterProxy = {
+    val tAppName = aConfig.applicationName.getOrElse(createDefaultApplicationName(aConfig))
+    val tBasePath = aConfig.basePath.getOrElse(new Path("hdfs:///jubatus-on-yarn"))
 
-    val tApplicationId = yarnClient.submitApplicationMaster(tFullName, aName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, location, aBasePath)
+    val tApplicationId = (aConfig.configFile, aConfig.configString) match {
+      case (Some(configFile), None) =>
+        // Launch using configFile
+        logger.info(s"starting Jubatus application ${tAppName} using configuration file")
 
-    registerApplication(tFullName, tApplicationId, aNodeCount)
-  }
+        yarnClient.submitApplicationMaster(
+          tAppName,
+          aConfig.learningMachineName,
+          aConfig.learningMachineType,
+          aConfig.zookeeper,
+          configFile,
+          aConfig.resource,
+          aConfig.nodeCount,
+          location,
+          tBasePath
+        )
+      case (None, Some(configString)) =>
+        // Launch using configString
+        logger.info(s"starting Jubatus application ${tAppName} using configuration string")
 
-  def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path): ApplicationMasterProxy = {
-    val tFullName = getFullName(aName, aLearningMachineType, aZookeepers)
-    logger.info(s"starting $tFullName")
+        yarnClient.submitApplicationMaster(
+          tAppName,
+          aConfig.learningMachineName,
+          aConfig.learningMachineType,
+          aConfig.zookeeper,
+          configString,
+          aConfig.resource,
+          aConfig.nodeCount,
+          location,
+          tBasePath
+        )
+      case _ =>
+        logger.error(s"failed to start Jubatus application: invalid configuration")
+        throw new IllegalArgumentException()
+    }
 
-    val tApplicationId = yarnClient.submitApplicationMaster(tFullName, aName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, location, aBasePath)
-
-    registerApplication(tFullName, tApplicationId, aNodeCount)
+    registerApplication(tAppName, tApplicationId, aConfig.nodeCount)
   }
 
   /**
@@ -135,6 +161,3 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   }
 
 }
-
-
-

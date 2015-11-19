@@ -48,25 +48,6 @@ class YarnClientServlet() extends RestServlet {
     mController = Some(aController)
   }
 
-  post("/start") {
-    logger.info(
-      s"""post("/start") is called.
-        |${request.body}
-      """.stripMargin)
-    Try {
-      val tSettings = parse(request.body).extract[ApplicationMasterSettings]
-      val tListZooKeeper: List[Location] = for (zk <- tSettings.zookeepers) yield Location(InetAddress.getByName(zk.address), zk.port)
-      mController.get.startJubatusApplication(tSettings.learningMachineInstanceName, tSettings.learningMachineType, tListZooKeeper, tSettings.configJson, tSettings.resources, tSettings.nodeCount, new Path(tSettings.basePath))
-    } match {
-      case Success(msg) =>
-        logger.info(msg.toString)
-        msg
-      case Failure(e) =>
-        logger.info("error happen.", e)
-        halt(400, e)
-    }
-  }
-
   put("/application/status") {
     logger.info(
       s"""put("/application/status") is called.
