@@ -14,6 +14,18 @@ APPLICATION_MASTER_PORT="${7}"
 LEARNING_MACHINE_NAME="${8}"
 LEARNING_MACHINE_TYPE="${9}"
 ZOOKEEPER="${10}"
+THREAD="${11}"
+TIMEOUT="${12}"
+MIXER="${13}"
+INTERVAL_SEC="${14}"
+INTERVAL_COUNT="${15}"
+ZOOKEEPER_TIMEOUT="${16}"
+INTERCONNECT_TIMEOUT="${17}"
+
+JUBATUS_SERVER_LOG_CONFIG_NAME="${18}"
+if [ -n "${JUBATUS_SERVER_LOG_CONFIG_NAME}" ]; then
+  JUBATUS_SERVER_LOG_CONFIG_OPTION="--log_config=${JUBATUS_SERVER_LOG_CONFIG_NAME}"
+fi
 
 IP_ADDRESS=`grep $(hostname) /etc/hosts | awk '{print $1}'`
 LISTEN_IF=`netstat -ie | grep -B1 ${IP_ADDRESS} | head -n1 | awk '{print $1}'`
@@ -27,8 +39,12 @@ for i in `seq 10`; do
     fi
   done
 
-  echo juba${LEARNING_MACHINE_TYPE} --zookeeper=${ZOOKEEPER} --interval_sec=10 --interval_count=0 --rpc-port=${JUBATUS_SERVER_PORT} --name=${LEARNING_MACHINE_NAME} --listen_if ${LISTEN_IF} >> /tmp/Container 2>&1
-  juba${LEARNING_MACHINE_TYPE} --zookeeper=${ZOOKEEPER} --interval_sec=10 --interval_count=0 --rpc-port=${JUBATUS_SERVER_PORT} --name=${LEARNING_MACHINE_NAME} --listen_if ${LISTEN_IF} &
+  echo juba${LEARNING_MACHINE_TYPE} --zookeeper=${ZOOKEEPER} --interval_sec=${INTERVAL_SEC} --interval_count=${INTERVAL_COUNT} --rpc-port=${JUBATUS_SERVER_PORT} \
+    --name=${LEARNING_MACHINE_NAME} --listen_if ${LISTEN_IF} --thread ${THREAD} --timeout ${TIMEOUT} --mixer ${MIXER} --zookeeper_timeout ${ZOOKEEPER_TIMEOUT} --interconnect_timeout ${INTERCONNECT_TIMEOUT} \
+    ${JUBATUS_SERVER_LOG_CONFIG_OPTION}
+  juba${LEARNING_MACHINE_TYPE} --zookeeper=${ZOOKEEPER} --interval_sec=${INTERVAL_SEC} --interval_count=${INTERVAL_COUNT} --rpc-port=${JUBATUS_SERVER_PORT} \
+    --name=${LEARNING_MACHINE_NAME} --listen_if ${LISTEN_IF} --thread ${THREAD} --timeout ${TIMEOUT} --mixer ${MIXER} --zookeeper_timeout ${ZOOKEEPER_TIMEOUT} --interconnect_timeout ${INTERCONNECT_TIMEOUT} \
+    ${JUBATUS_SERVER_LOG_CONFIG_OPTION} &
   JUBATUS_SERVER_PROCESS_ID=$!
 
   # jubatus server の起動待機
@@ -37,7 +53,7 @@ for i in `seq 10`; do
       continue 2
     fi
 
-    echo jubactl --zookeeper=${ZOOKEEPER} --server=juba${LEARNING_MACHINE_TYPE} --type=${LEARNING_MACHINE_TYPE} --name=${LEARNING_MACHINE_NAME} --cmd status >> /tmp/Container 2>&1
+    echo jubactl --zookeeper=${ZOOKEEPER} --server=juba${LEARNING_MACHINE_TYPE} --type=${LEARNING_MACHINE_TYPE} --name=${LEARNING_MACHINE_NAME} --cmd status
     if (jubactl --zookeeper=${ZOOKEEPER} --server=juba${LEARNING_MACHINE_TYPE} --type=${LEARNING_MACHINE_TYPE} --name=${LEARNING_MACHINE_NAME} --cmd status \
         | awk '/active '${LEARNING_MACHINE_NAME}' members:/ {flag=1; next} /active/ {flag=0} flag==1 {print}' \
         | grep "^${IP_ADDRESS}_${JUBATUS_SERVER_PORT}$"); then
@@ -57,11 +73,11 @@ fi
 echo $JAVA_HOME/bin/java -Xmx${CONTAINER_MEMORY_SIZE}M ${CONTAINER_JRA_MAIN_CLASS} --seq ${SEQ} \
     --application-name ${APPLICATION_NAME} --application-master-address ${APPLICATION_MASTER_ADDRESS} --application-master-port ${APPLICATION_MASTER_PORT} \
     --container-node-address ${IP_ADDRESS} --jubatus-server-port ${JUBATUS_SERVER_PORT} --jubatus-server-process-id ${JUBATUS_SERVER_PROCESS_ID} \
-    --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE} >> /tmp/Container 2>&1
+    --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE}
 $JAVA_HOME/bin/java -Xmx${CONTAINER_MEMORY_SIZE}M ${CONTAINER_JRA_MAIN_CLASS} --seq ${SEQ} \
     --application-name ${APPLICATION_NAME} --application-master-address ${APPLICATION_MASTER_ADDRESS} --application-master-port ${APPLICATION_MASTER_PORT} \
     --container-node-address ${IP_ADDRESS} --jubatus-server-port ${JUBATUS_SERVER_PORT} --jubatus-server-process-id ${JUBATUS_SERVER_PROCESS_ID} \
-    --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE} >> /tmp/Container 2>&1
+    --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE}
 EXIT_CODE=$?
 ps ${JUBATUS_SERVER_PROCESS_ID} && kill ${JUBATUS_SERVER_PROCESS_ID}
 exit $EXIT_CODE

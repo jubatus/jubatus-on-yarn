@@ -16,15 +16,19 @@
 package us.jubat.yarn.client
 
 import java.net.InetAddress
-
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.yarn.api.records.{FinalApplicationStatus, ApplicationReport, ApplicationId}
+import org.apache.hadoop.yarn.api.records.{FinalApplicationStatus, ApplicationReport, ApplicationId, YarnApplicationState}
 import org.scalatest._
 import us.jubat.yarn.common.{LearningMachineType, Location}
+import us.jubat.common.ClientBase
 
-class YarnClientControllerSpec extends FlatSpec with Matchers {
+class YarnClientControllerSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   class DummyYarnClient extends YarnClient {
+    override def submitApplicationMaster(aJubatusClusterConfiguration: JubatusClusterConfiguration, aManagementLocation: Location): ApplicationId = {
+      ApplicationId.newInstance(0, 0)
+    }
+
     override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
       ApplicationId.newInstance(0, 0)
     }
@@ -33,14 +37,80 @@ class YarnClientControllerSpec extends FlatSpec with Matchers {
       ApplicationId.newInstance(0, 0)
     }
 
-    override def getStatus(aApplicationId: ApplicationId): ApplicationReport = ???
+    override def getStatus(aApplicationId: ApplicationId): ApplicationReport = {
+      val appId: ApplicationId = ApplicationId.newInstance(System.currentTimeMillis(), 1111)
+      ApplicationReport.newInstance(appId, null, "dummyUser", "dummyQueue", "dummyName",
+          "dummyHost", 0, null, YarnApplicationState.RUNNING, "", "url", System.currentTimeMillis(), 0,
+          FinalApplicationStatus.UNDEFINED, null, "origTrackingUrl", 0, "Classifier", null)
+    }
 
     override def kill(aApplicationId: ApplicationId): Unit = ???
 
     override def getFinalStatus(aApplicationId: ApplicationId): FinalApplicationStatus = ???
   }
 
-  def createController() = new YarnClientController(Location(InetAddress.getLocalHost, 0), new DummyYarnClient)
+  class DummyClient(host: String, port: Int, name: String) extends ClientBase(host, port, name, 10) {
+    override def getStatus(): java.util.Map[String, java.util.Map[String, String]] = {
+      val statusMap: java.util.Map[String, java.util.Map[String, String]] = new java.util.HashMap()
+      val subStatus: java.util.Map[String, String] = new java.util.HashMap()
+      subStatus.put("type", "classifier")
+      subStatus.put("VERSION", "0.8.1")
+      subStatus.put("PROGNAME", "jubaclassifier")
+      statusMap.put("server1", subStatus)
+      statusMap.put("server2", subStatus)
+      statusMap
+    }
+
+    override def getProxyStatus(): java.util.Map[String, java.util.Map[String, String]] = {
+      val statusMap: java.util.Map[String, java.util.Map[String, String]] = new java.util.HashMap()
+      val subStatus: java.util.Map[String, String] = new java.util.HashMap()
+      subStatus.put("user", "user")
+      subStatus.put("VERSION", "0.8.1")
+      subStatus.put("PROGNAME", "jubaclassifier_proxy")
+      statusMap.put("proxy1", subStatus)
+      statusMap
+    }
+  }
+
+  def createController() = new YarnClientController(Location(InetAddress.getLocalHost, 0), new DummyYarnClient())
+
+  "startJubatusApplication ()" should "check applicationName" in {
+
+    val machineType = LearningMachineType.Classifier
+    val zookeeper1 = new Location("localhost",2188)
+    val zookeeper2 = new Location("127.0.0.2",2189)
+
+    val tController = createController()
+
+    var result = tController.startJubatusApplication("model1", machineType, List(zookeeper1,zookeeper2), "configString", Resource(0, 0, 0), 3, null)
+    result.name shouldBe "model1:" + machineType.name + ":" + zookeeper1.hostAddress + ":" + zookeeper1.port + "," + zookeeper2.hostAddress + ":" + zookeeper2.port
+
+    result = tController.startJubatusApplication("model2", machineType, List(zookeeper1,zookeeper2), "configString", Resource(0, 0, 0), 3, null, "dummyApplicationName2")
+    result.name shouldBe "dummyApplicationName2"
+
+    result = tController.startJubatusApplication("model3", machineType, List(zookeeper1,zookeeper2), new Path("/tmp/dummyFile"), Resource(0, 0, 0), 3, null)
+    result.name shouldBe "model3:" + machineType.name + ":" + zookeeper1.hostAddress + ":" + zookeeper1.port + "," + zookeeper2.hostAddress + ":" + zookeeper2.port
+
+    result = tController.startJubatusApplication("model4", machineType, List(zookeeper1,zookeeper2), new Path("/tmp/dummyFile"), Resource(0, 0, 0), 3, null, "dummyApplicationName4")
+    result.name shouldBe "dummyApplicationName4"
+  }
+
+  "status()" should "success getStatus" in {
+
+    val machineType = LearningMachineType.Classifier
+    val zookeeper1 = new Location("localhost", 2188)
+    val tController = createController()
+    var result = tController.startJubatusApplication("model1", machineType, List(zookeeper1), "configString", Resource(0, 0, 0), 3, null)
+    tController.mClient = Some(new DummyClient("localhost", 9999, "name"))
+
+    val yarnAppStatus = tController.status
+    yarnAppStatus.jubatusProxy.size() shouldBe 1
+    yarnAppStatus.jubatusServers.size() shouldBe 2
+    yarnAppStatus.yarnApplication.size() shouldBe 3
+    yarnAppStatus.yarnApplication.get("applicationReport") should not be None
+    yarnAppStatus.yarnApplication.get("currentTime") should not be None
+    yarnAppStatus.yarnApplication.get("oparatingTime") should not be None
+  }
 
 //  "start one" should "not throw exception" in {
 //    val tController = createController()

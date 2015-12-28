@@ -110,3 +110,49 @@ object Predef extends scala.LowPriorityImplicits {
     if (!aRequirement) throw new IllegalStateException(aMessage.toString)
   }
 }
+
+object Mixer {
+  case object Linear extends Mixer("linear_mixer")
+  case object Random extends Mixer("random_mixer")
+  case object Broadcast extends Mixer("broadcast_mixer")
+  case object Skip extends Mixer("skip_mixer")
+
+  def valueOf(aValue: String): Mixer = {
+    aValue match {
+      case Mixer.Linear.name => Linear
+      case Mixer.Random.name => Random
+      case Mixer.Broadcast.name => Broadcast
+      case Mixer.Skip.name => Skip
+    }
+  }
+}
+sealed abstract class Mixer(val name: String)
+
+object ServerConfig {
+  val defaultThread: Int = 2
+  val defaultTimeout: Int = 10
+  val defaultMixer: Mixer = Mixer.Linear
+  val defaultIntervalSec: Int = 16
+  val defaultIntervalCount: Int = 512
+  val defaultZookeeperTimeout: Int = 10
+  val defaultInterconnectTimeout: Int = 10
+}
+case class ServerConfig(thread: Int = ServerConfig.defaultThread, timeout: Int = ServerConfig.defaultTimeout,
+    mixer: Mixer = ServerConfig.defaultMixer, intervalSec: Int = ServerConfig.defaultIntervalSec,
+    intervalCount: Int = ServerConfig.defaultIntervalCount, zookeeperTimeout: Int = ServerConfig.defaultZookeeperTimeout,
+    interconnectTimeout: Int = ServerConfig.defaultInterconnectTimeout)
+
+object ProxyConfig {
+  val defaultThread: Int = 4
+  val defaultTimeout: Int = 10
+  val defaultZookeeperTimeout: Int = 10
+  val defaultInterconnectTimeout: Int = 10
+  val defaultPoolExpire: Int = 60
+  val defaultPoolSize: Int = 0
+}
+case class ProxyConfig(thread: Int = ProxyConfig.defaultThread, timeout: Int = ProxyConfig.defaultTimeout,
+    zookeeperTimeout: Int = ProxyConfig.defaultZookeeperTimeout, interconnectTimeout: Int = ProxyConfig.defaultInterconnectTimeout,
+    poolExpire: Int = ProxyConfig.defaultPoolExpire, poolSize: Int = ProxyConfig.defaultPoolSize)
+
+case class LogConfig(applicationMasterLogConfigPath: Option[String], jubatusProxyLogConfigPath: Option[String], jubatusServerLogConfigPath: Option[String])
+
