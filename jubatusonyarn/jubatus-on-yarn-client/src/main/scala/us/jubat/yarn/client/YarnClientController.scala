@@ -35,7 +35,7 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   def isFinished = mIsFinished
 
   private var mApplicationMaster: Option[ApplicationMasterProxy] = None
-  private var mClient: Option[ClientBase] = None
+  private[client] var mClient: Option[ClientBase] = None
 
   private def getFullName(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location]): String = {
     s"$aName:${aLearningMachineType.name}:${aZookeepers.map(z => z.hostAddress + ":" + z.port).mkString(",")}"
@@ -47,7 +47,11 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   }
 
   def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path): ApplicationMasterProxy = {
-    val tFullName = getFullName(aName, aLearningMachineType, aZookeepers)
+    startJubatusApplication(aName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, aBasePath, null)
+  }
+
+  def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodeCount: Int, aBasePath: Path, aApplicationName: String): ApplicationMasterProxy = {
+    val tFullName = Option(aApplicationName).getOrElse(getFullName(aName, aLearningMachineType, aZookeepers))
     logger.info(s"starting $tFullName")
 
     val tApplicationId = yarnClient.submitApplicationMaster(tFullName, aName, aLearningMachineType, aZookeepers, aConfigString, aResource, aNodeCount, location, aBasePath)
@@ -56,7 +60,11 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   }
 
   def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path): ApplicationMasterProxy = {
-    val tFullName = getFullName(aName, aLearningMachineType, aZookeepers)
+    startJubatusApplication(aName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, aBasePath, null)
+  }
+
+  def startJubatusApplication(aName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodeCount: Int, aBasePath: Path, aApplicationName: String): ApplicationMasterProxy = {
+    val tFullName = Option(aApplicationName).getOrElse(getFullName(aName, aLearningMachineType, aZookeepers))
     logger.info(s"starting $tFullName")
 
     val tApplicationId = yarnClient.submitApplicationMaster(tFullName, aName, aLearningMachineType, aZookeepers, aConfigFile, aResource, aNodeCount, location, aBasePath)
@@ -89,10 +97,19 @@ class YarnClientController(location: Location, yarnClient: YarnClient = new Defa
   def status: JubatusYarnApplicationStatus = {
     requireState(mApplicationMaster.isDefined)
     requireState(mClient.isDefined)
+
+    val appReport = yarnClient.getStatus(mApplicationMaster.get.applicationId)
+    val curTime = System.currentTimeMillis()
+    val opTime = curTime - appReport.getStartTime()
+    var appMap: java.util.Map[String, Any] = new java.util.LinkedHashMap()
+    appMap.put("applicationReport", appReport)
+    appMap.put("currentTime", curTime)
+    appMap.put("oparatingTime", opTime)
+
     JubatusYarnApplicationStatus(
-      jubatusProxy = mClient.get.getProxyStatus,
+      jubatusProxy =   mClient.get.getProxyStatus,
       jubatusServers = mClient.get.getStatus,
-      yarnApplication = yarnClient.getStatus(mApplicationMaster.get.applicationId)
+      yarnApplication = appMap
     )
   }
 
