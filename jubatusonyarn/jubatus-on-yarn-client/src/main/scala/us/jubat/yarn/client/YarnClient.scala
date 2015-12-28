@@ -25,14 +25,18 @@ import org.apache.hadoop.yarn.api.records.{Resource => YarnResource, _}
 import org.apache.hadoop.yarn.client.api.{YarnClient => HadoopYarnClient}
 import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.util.{Apps, ConverterUtils, Records}
-import us.jubat.yarn.common.{HasLogger, LearningMachineType, Location}
+import us.jubat.yarn.common.{HasLogger, LearningMachineType, Location, ServerConfig, ProxyConfig}
 
 import scala.collection.JavaConverters._
 import scala.io.Source
 
 trait YarnClient {
+  def submitApplicationMaster(aJubatusClusterConfiguration: JubatusClusterConfiguration, aManagementLocation: Location): ApplicationId
+
+  @deprecated("not recommended use the submitApplicationMaster(JubatusClusterConfiguration, Location)")
   def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId
 
+  @deprecated("not recommended use the submitApplicationMaster(JubatusClusterConfiguration, Location)")
   def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId
 
   def getStatus(aApplicationId: ApplicationId): ApplicationReport
@@ -51,14 +55,11 @@ class DefaultYarnClient extends YarnClient with HasLogger {
   private def jubaConfigBasePath(aBasePath: Path): Path = new Path(aBasePath, "application-master/jubaconfig")
 
   private val jubaConfigName: String = "jubaconfig.json"
-  private val jubaProxyMemory: Int = 32
 
   private def applicationMasterJarPath(aBasePath: Path): Path = new Path(aBasePath, "application-master/jubatus-on-yarn-application-master.jar")
 
   private val applicationMasterJarName: String = "jubatus-on-yarn-application-master.jar"
   private val applicationMasterMainClass: String = "us.jubat.yarn.applicationmaster.ApplicationMasterApp"
-  private val applicationMasterMemory: Int = 128
-  private val applicationMasterVirtualCores: Int = 1
 
   private val mYarnConfig = new YarnConfiguration()
   private val mYarnClient = {
@@ -79,6 +80,7 @@ class DefaultYarnClient extends YarnClient with HasLogger {
     tResource
   }
 
+  @deprecated("not recommended use the submitApplicationMaster(JubatusClusterConfiguration, Location)")
   override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigString: String, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
     val tHdfsPath = new Path(jubaConfigBasePath(aBasePath), s"${aApplicationName.replaceAll(":", "_")}.json")
 
@@ -92,16 +94,27 @@ class DefaultYarnClient extends YarnClient with HasLogger {
     submitApplicationMaster(aApplicationName, aLearningMachineInstanceName, aLearningMachineType, aZookeepers, tHdfsPath, aResource, aNodes, aManagementLocation, aBasePath)
   }
 
-
+  @deprecated("not recommended use the submitApplicationMaster(JubatusClusterConfiguration, Location)")
   override def submitApplicationMaster(aApplicationName: String, aLearningMachineInstanceName: String, aLearningMachineType: LearningMachineType, aZookeepers: List[Location], aConfigFile: Path, aResource: Resource, aNodes: Int, aManagementLocation: Location, aBasePath: Path): ApplicationId = {
-    logger.info(s"call submitApplicationMaster($aApplicationName, $aLearningMachineInstanceName, $aLearningMachineType, $aZookeepers, $aConfigFile, $aResource, $aNodes, $aManagementLocation)")
+    val jubaClusterConfig = JubatusClusterConfiguration(aLearningMachineInstanceName, aLearningMachineType, aZookeepers, "",
+      aConfigFile, aResource, aNodes, aApplicationName, ServerConfig(), ProxyConfig(), aBasePath)
+    submitApplicationMaster(jubaClusterConfig, aManagementLocation)
+  }
+
+  override def submitApplicationMaster(aJubatusClusterConfiguration: JubatusClusterConfiguration, aManagementLocation: Location): ApplicationId = {
+    logger.info(s"call submitApplicationMaster($aJubatusClusterConfiguration, $aManagementLocation)")
+
+    var configFile = aJubatusClusterConfiguration.configFile
+    if (aJubatusClusterConfiguration.configFile == null) {
+      configFile = createConfigFile(aJubatusClusterConfiguration.applicationName, aJubatusClusterConfiguration.configString, aJubatusClusterConfiguration.basePath)
+    }
     val tApplicationMasterContext = Records.newRecord(classOf[ContainerLaunchContext])
 
     tApplicationMasterContext.setLocalResources(
       Map(
-        entryScriptName -> toLocalResource(entryScriptPath(aBasePath)),
-        jubaConfigName -> toLocalResource(aConfigFile),
-        applicationMasterJarName -> toLocalResource(applicationMasterJarPath(aBasePath))
+        entryScriptName -> toLocalResource(entryScriptPath(aJubatusClusterConfiguration.basePath)),
+        jubaConfigName -> toLocalResource(configFile),
+        applicationMasterJarName -> toLocalResource(applicationMasterJarPath(aJubatusClusterConfiguration.basePath))
       ).asJava
     )
 
@@ -122,31 +135,59 @@ class DefaultYarnClient extends YarnClient with HasLogger {
       case LearningMachineType.Anomaly => "anomaly"
       case LearningMachineType.Recommender => "recommender"
     }
+
+    var containerNodes: String = """\"\""""
+    if (aJubatusClusterConfiguration.resource.containerNodes != null) {
+      containerNodes = s"""\"${aJubatusClusterConfiguration.resource.containerNodes.mkString(",")}\""""
+    }
+    var containerRacks: String = """\"\""""
+    if (aJubatusClusterConfiguration.resource.containerRacks != null) {
+      containerRacks = s"""\"${aJubatusClusterConfiguration.resource.containerRacks.mkString(",")}\""""
+    }
+
     val tCommand = (
       s"bash $entryScriptName"
         // ApplicationMaster の jar 起動用 java コマンド
         + s" $applicationMasterJarName"
         + s" $applicationMasterMainClass"
-        + s" $applicationMasterMemory"
+        + s" ${aJubatusClusterConfiguration.resource.masterMemory}"
 
         // ApplicationMaster
-        + s" $aApplicationName" // --application-name
+        + s" ${aJubatusClusterConfiguration.applicationName}" // --application-name
         + s" ${aManagementLocation.hostAddress}" // --management-address
         + s" ${aManagementLocation.port}" // --management-port
-        + s" $aNodes" // --nodes
-        + s" ${aResource.priority}" // --priority
-        + s" ${aResource.memory}" // --memory
-        + s" ${aResource.virtualCores}" // --virtual-cores
+        + s" ${aJubatusClusterConfiguration.nodeCount}" // --nodes
+        + s" ${aJubatusClusterConfiguration.resource.priority}" // --priority
+        + s" ${aJubatusClusterConfiguration.resource.memory}" // --memory
+        + s" ${aJubatusClusterConfiguration.resource.virtualCores}" // --virtual-cores
+        + s" ${aJubatusClusterConfiguration.resource.containerMemory}" // --container-memory
+        + s" ${containerNodes}" // --container-nodes
+        + s" ${containerRacks}" // --container-racks
 
         // ApplicationMaster, juba*_proxy, jubaconfig
-        + s" $aLearningMachineInstanceName" // --learning-machine-name / --name
-        + s" ${typeToString(aLearningMachineType)}" // --learning-machine-type / juba{}_proxy
-        + s" ${aZookeepers.map { z => s"${z.hostAddress}:${z.port}"}.mkString(",")}" // --zookeeper / --zookeeper
+        + s" ${aJubatusClusterConfiguration.learningMachineName}" // --learning-machine-name / --name
+        + s" ${typeToString(aJubatusClusterConfiguration.learningMachineType)}" // --learning-machine-type / juba{}_proxy
+        + s" ${aJubatusClusterConfiguration.zookeepers.map { z => s"${z.hostAddress}:${z.port}"}.mkString(",")}" // --zookeeper / --zookeeper
 
         // jubaconfig
         + s" $jubaConfigName" // -file
 
-        + s" $aBasePath" // ApplicationMaster
+        + s" ${aJubatusClusterConfiguration.basePath}" // ApplicationMaster
+        + s" ${aJubatusClusterConfiguration.serverConfig.thread}"  // --thread
+        + s" ${aJubatusClusterConfiguration.serverConfig.timeout}"  // --timeout
+        + s" ${aJubatusClusterConfiguration.serverConfig.mixer.name}"  // --mixer
+        + s" ${aJubatusClusterConfiguration.serverConfig.intervalSec}"  // --interval_sec
+        + s" ${aJubatusClusterConfiguration.serverConfig.intervalCount}"  // --interval_count
+        + s" ${aJubatusClusterConfiguration.serverConfig.zookeeperTimeout}"  // --zookeeper_timeout
+        + s" ${aJubatusClusterConfiguration.serverConfig.interconnectTimeout}"  // --interconnect_timeout
+
+        // juba*_proxy
+        + s" ${aJubatusClusterConfiguration.proxyConfig.thread}"  // --thread
+        + s" ${aJubatusClusterConfiguration.proxyConfig.timeout}"  // --timeout
+        + s" ${aJubatusClusterConfiguration.proxyConfig.zookeeperTimeout}"  // --zookeeper_timeout
+        + s" ${aJubatusClusterConfiguration.proxyConfig.interconnectTimeout}"  // --interconnect_timeout
+        + s" ${aJubatusClusterConfiguration.proxyConfig.poolExpire}"  // --pool_expire
+        + s" ${aJubatusClusterConfiguration.proxyConfig.poolSize}"  // --pool_size
 
         + s" 1>${ApplicationConstants.LOG_DIR_EXPANSION_VAR}/stdout"
         + s" 2>${ApplicationConstants.LOG_DIR_EXPANSION_VAR}/stderr"
@@ -155,20 +196,20 @@ class DefaultYarnClient extends YarnClient with HasLogger {
 
     // リソース
     val tResource = Records.newRecord(classOf[YarnResource])
-    tResource.setMemory(jubaProxyMemory + applicationMasterMemory)
-    tResource.setVirtualCores(applicationMasterVirtualCores)
+    tResource.setMemory(aJubatusClusterConfiguration.resource.proxyMemory + aJubatusClusterConfiguration.resource.masterMemory)
+    tResource.setVirtualCores(aJubatusClusterConfiguration.resource.masterCores)
 
     // Application Master 登録
     val tApplication = mYarnClient.createApplication()
     val tContext = tApplication.getApplicationSubmissionContext
-    tContext.setApplicationName(aApplicationName)
+    tContext.setApplicationName(aJubatusClusterConfiguration.applicationName)
     tContext.setAMContainerSpec(tApplicationMasterContext)
     tContext.setResource(tResource)
     tContext.setQueue("default")
 
     logger.info(
       s"submit ApplicationMaster\n"
-        + s"\tname: $aApplicationName\n"
+        + s"\tname: ${aJubatusClusterConfiguration.applicationName}\n"
         + s"\tcommand: $tCommand\n"
         + s"\tmemory: ${tResource.getMemory}\n"
         + s"\tvirtualCores: ${tResource.getVirtualCores}"
@@ -183,5 +224,17 @@ class DefaultYarnClient extends YarnClient with HasLogger {
   override def kill(aApplicationId: ApplicationId): Unit = {
     logger.info(s"kill $aApplicationId")
     mYarnClient.killApplication(aApplicationId)
+  }
+
+  private def createConfigFile(aApplicationName: String, aConfigString: String, aBasePath: Path): Path = {
+    val tHdfsPath = new Path(jubaConfigBasePath(aBasePath), s"${aApplicationName.replaceAll(":", "_")}.json")
+
+    val tTempFile = File.createTempFile(s"jubatus-on-yarn-server", ".json")
+    val tWriter = new PrintWriter(tTempFile)
+    tWriter.println(aConfigString)
+    tWriter.close()
+
+    FileSystem.get(mYarnConfig).copyFromLocalFile(true, true, new Path(tTempFile.getPath), tHdfsPath)
+    tHdfsPath
   }
 }

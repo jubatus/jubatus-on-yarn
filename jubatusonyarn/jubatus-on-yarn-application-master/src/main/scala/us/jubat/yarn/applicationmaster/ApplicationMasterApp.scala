@@ -118,6 +118,15 @@ class ApplicationMasterParams {
   @org.kohsuke.args4j.Option(name = "--virtual-cores")
   var virtualCores: Int = 1
 
+  @org.kohsuke.args4j.Option(name = "--container-memory")
+  var containerMemory: Int = 128
+
+  @org.kohsuke.args4j.Option(name = "--container-nodes")
+  var containerNodes: String = ""
+
+  @org.kohsuke.args4j.Option(name = "--container-racks")
+  var containerRacks: String = ""
+
 
   @org.kohsuke.args4j.Option(name = "--learning-machine-name")
   var learningMachineName: String = ""
@@ -148,4 +157,38 @@ class ApplicationMasterParams {
 
   @org.kohsuke.args4j.Option(name = "--base-path")
   var basePath: String = ""
+
+  @org.kohsuke.args4j.Option(name = "--thread")
+  var thread: Int = 2
+
+  @org.kohsuke.args4j.Option(name = "--timeout")
+  var timeout: Int = 10
+
+  @org.kohsuke.args4j.Option(name = "--mixer")
+  var mixer: String = "linear_mixer"
+
+  @org.kohsuke.args4j.Option(name = "--interval_sec")
+  var intervalSec: Int = 16
+
+  @org.kohsuke.args4j.Option(name = "--interval_count")
+  var intervalCount: Int = 512
+
+  @org.kohsuke.args4j.Option(name = "--zookeeper_timeout")
+  var zookeeperTimeout: Int = 10
+
+  @org.kohsuke.args4j.Option(name = "--interconnect_timeout")
+  var interconnectTimeout: Int = 10
+
+  override def toString(): String = {
+    val text = s"""applicationName: $applicationName, nodes: $nodes, priority: $priority,
+      memory: $memory, virtualCores: $virtualCores, containerMemory: $containerMemory,
+      containerNodes: $containerNodes, containerRacks: $containerRacks, learningMachineName: $learningMachineName,
+      learningMachineType: $learningMachineType, zooKeepers: $zooKeepers, managementAddress: $managementAddress,
+      managementPort: $managementPort, applicationMasterNodeAddress: $applicationMasterNodeAddress,
+      jubatusProxyPort: $jubatusProxyPort, jubatusProxyProcessId: $jubatusProxyProcessId,
+      thread: $thread, timeout: $timeout, mixer: $mixer, intervalSec: $intervalSec, intervalCount: $intervalCount,
+      zookeeperTimeout: $zookeeperTimeout, interconnectTimeout: $interconnectTimeout
+      """.stripMargin.trim
+    text
+  }
 }
