@@ -38,12 +38,13 @@ class ApplicationMaster extends HasLogger {
   private def containerJarPath(aBasePath: Path): Path = new Path(aBasePath, "container/jubatus-on-yarn-container.jar")
   private val containerJarName: String = "jubatus-on-yarn-container.jar"
   private val containerMainClass: String = "us.jubat.yarn.container.ContainerApp"
-  private val containerMemory: Int = 128
 
   private val mYarnConfig = new YarnConfiguration()
 
   // 終了までブロックする
   def run(aParams: ApplicationMasterParams, aApplicationMasterPort: Int): FinalApplicationStatus = {
+    logger.debug(s"ApplicationMasterParams (${aParams.toString()})")
+
     val tHandler = new ApplicationMasterHandler(aParams, aApplicationMasterPort)
 
     val tResourceManager = AMRMClientAsync.createAMRMClientAsync[ContainerRequest](500, tHandler)
@@ -56,8 +57,17 @@ class ApplicationMaster extends HasLogger {
     tPriority.setPriority(aParams.priority)
 
     val tResource = Records.newRecord(classOf[Resource])
-    tResource.setMemory(aParams.memory + containerMemory)
+    tResource.setMemory(aParams.memory + aParams.containerMemory)
     tResource.setVirtualCores(aParams.virtualCores)
+
+    var containerNodes: Array[String] = null
+    var containerRacks: Array[String] = null
+    if (!aParams.containerNodes.isEmpty()) {
+      containerNodes = aParams.containerNodes.split(",").toArray[String]
+    }
+    if (!aParams.containerRacks.isEmpty()) {
+      containerRacks = aParams.containerRacks.split(",").toArray[String]
+    }
 
     // コンテナを起動
     (1 to aParams.nodes).foreach { _ =>
@@ -67,7 +77,9 @@ class ApplicationMaster extends HasLogger {
         + s"\tmemory: ${tResource.getMemory}\n"
         + s"\tvirtualCores: ${tResource.getVirtualCores}"
       )
-      tResourceManager.addContainerRequest(new ContainerRequest(tResource, null, null, tPriority))
+      val containerReq = new ContainerRequest(tResource, containerNodes, containerRacks, tPriority)
+      tResourceManager.addContainerRequest(containerReq)
+      logger.debug(s"ContainerRequest( Nodes:${containerReq.getNodes}, Racks:${containerReq.getRacks}")
     }
 
     // コンテナの終了を待機
@@ -140,7 +152,7 @@ class ApplicationMaster extends HasLogger {
           s"bash $entryScriptName"
             + s" $containerJarName"
             + s" $containerMainClass"
-            + s" $containerMemory"
+            + s" ${aParams.containerMemory}"
 
             // jar にわたす
             + s" ${aParams.applicationName}"  // --application-name
@@ -152,6 +164,13 @@ class ApplicationMaster extends HasLogger {
             + s" ${aParams.learningMachineName}"  // --name
             + s" ${aParams.learningMachineType}"  // juba{*}
             + s" ${aParams.zooKeepers}" // --zookeeper
+            + s" ${aParams.thread}"  // --thread
+            + s" ${aParams.timeout}"  // --timeout
+            + s" ${aParams.mixer}"  // --mixer
+            + s" ${aParams.intervalSec}"  // --interval_sec
+            + s" ${aParams.intervalCount}"  // --interval_count
+            + s" ${aParams.zookeeperTimeout}"  // --zookeeper_timeout
+            + s" ${aParams.interconnectTimeout}"  // --interconnect_timeout
 
             + s" 1>${ApplicationConstants.LOG_DIR_EXPANSION_VAR}/stdout"
             + s" 2>${ApplicationConstants.LOG_DIR_EXPANSION_VAR}/stderr"
