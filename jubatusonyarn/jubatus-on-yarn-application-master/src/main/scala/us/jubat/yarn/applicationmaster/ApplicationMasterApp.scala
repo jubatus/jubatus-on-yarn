@@ -118,6 +118,15 @@ class ApplicationMasterParams {
   @org.kohsuke.args4j.Option(name = "--virtual-cores")
   var virtualCores: Int = 1
 
+  @org.kohsuke.args4j.Option(name = "--container-memory")
+  var containerMemory: Int = 128
+
+  @org.kohsuke.args4j.Option(name = "--container-nodes")
+  var containerNodes: String = ""
+
+  @org.kohsuke.args4j.Option(name = "--container-racks")
+  var containerRacks: String = ""
+
 
   @org.kohsuke.args4j.Option(name = "--learning-machine-name")
   var learningMachineName: String = ""
@@ -148,4 +157,15 @@ class ApplicationMasterParams {
 
   @org.kohsuke.args4j.Option(name = "--base-path")
   var basePath: String = ""
+
+  override def toString(): String = {
+    val text = s"""applicationName: $applicationName, nodes: $nodes, priority: $priority,
+      memory: $memory, virtualCores: $virtualCores, containerMemory: $containerMemory,
+      containerNodes: $containerNodes, containerRacks: $containerRacks, learningMachineName: $learningMachineName,
+      learningMachineType: $learningMachineType, zooKeepers: $zooKeepers, managementAddress: $managementAddress,
+      managementPort: $managementPort, applicationMasterNodeAddress: $applicationMasterNodeAddress,
+      jubatusProxyPort: $jubatusProxyPort, jubatusProxyProcessId: $jubatusProxyProcessId
+      """.stripMargin.trim
+    text
+  }
 }

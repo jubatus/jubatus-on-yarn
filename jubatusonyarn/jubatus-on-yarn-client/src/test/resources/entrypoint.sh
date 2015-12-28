@@ -13,14 +13,17 @@ NODE_COUNT="${7}"
 PRIORITY="${8}"
 MEMORY="${9}"
 VIRTUAL_CORES="${10}"
+CONTAINER_MEMORY="${11}"
+CONTAINER_NODES="${12}"
+CONTAINER_RACKS="${13}"
 
-LEARNING_MACHINE_NAME="${11}"
-LEARNING_MACHINE_TYPE="${12}"
-ZOOKEEPER="${13}"
+LEARNING_MACHINE_NAME="${14}"
+LEARNING_MACHINE_TYPE="${15}"
+ZOOKEEPER="${16}"
 
-CONFIG_FILE="${14}"
+CONFIG_FILE="${17}"
 
-BASE_PATH="${15}"
+BASE_PATH="${18}"
 
 IP_ADDRESS=`grep $(hostname) /etc/hosts | awk '{print $1}'`
 LISTEN_IF=`netstat -ie | grep -B1 ${IP_ADDRESS} | head -n1 | awk '{print $1}'`
@@ -70,12 +73,14 @@ fi
 
 # launch `ApplicationMaster`
 echo $JAVA_HOME/bin/java -Xmx${APPLICATION_MASTER_MEMORY}M ${APPLICATION_MASTER_MAIN_CLASS} --application-name ${APPLICATION_NAME} --nodes ${NODE_COUNT} --priority ${PRIORITY} --memory ${MEMORY} \
-  --virtual-cores ${VIRTUAL_CORES} --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE} \
+  --virtual-cores ${VIRTUAL_CORES} --container-memory ${CONTAINER_MEMORY} --container-nodes "${CONTAINER_NODES}" --container-racks "${CONTAINER_RACKS}" \
+  --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE} \
   --zookeeper ${ZOOKEEPER} --management-address ${MANAGEMENT_ADDRESS} --management-port ${MANAGEMENT_PORT} \
   --application-master-node-address ${IP_ADDRESS} --jubatus-proxy-port ${JUBATUS_PROXY_PORT} --jubatus-proxy-process-id ${JUBATUS_PROXY_PROCESS_ID} \
   --base-path ${BASE_PATH} >> /tmp/ApplicationMaster 2>&1
 $JAVA_HOME/bin/java -Xmx${APPLICATION_MASTER_MEMORY}M ${APPLICATION_MASTER_MAIN_CLASS} --application-name ${APPLICATION_NAME} --nodes ${NODE_COUNT} --priority ${PRIORITY} --memory ${MEMORY} \
-  --virtual-cores ${VIRTUAL_CORES} --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE} \
+  --virtual-cores ${VIRTUAL_CORES} --container-memory ${CONTAINER_MEMORY} --container-nodes "${CONTAINER_NODES}" --container-racks "${CONTAINER_RACKS}" \
+  --learning-machine-name ${LEARNING_MACHINE_NAME} --learning-machine-type ${LEARNING_MACHINE_TYPE} \
   --zookeeper ${ZOOKEEPER} --management-address ${MANAGEMENT_ADDRESS} --management-port ${MANAGEMENT_PORT} \
   --application-master-node-address ${IP_ADDRESS} --jubatus-proxy-port ${JUBATUS_PROXY_PORT} --jubatus-proxy-process-id ${JUBATUS_PROXY_PROCESS_ID} \
   --base-path ${BASE_PATH} >> /tmp/ApplicationMaster 2>&1
