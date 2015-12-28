@@ -110,3 +110,73 @@ object Predef extends scala.LowPriorityImplicits {
     if (!aRequirement) throw new IllegalStateException(aMessage.toString)
   }
 }
+
+object Mixer {
+  case object Linear extends Mixer("linear_mixer")
+  case object Random extends Mixer("random_mixer")
+  case object Broadcast extends Mixer("broadcast_mixer")
+  case object Skip extends Mixer("skip_mixer")
+
+  def valueOf(aValue: String): Mixer = {
+    aValue match {
+      case Mixer.Linear.name => Linear
+      case Mixer.Random.name => Random
+      case Mixer.Broadcast.name => Broadcast
+      case Mixer.Skip.name => Skip
+    }
+  }
+}
+sealed abstract class Mixer(val name: String)
+abstract class ItemKey(val name: String)
+
+object ServerConfig {
+  val defaultThread: Int = 2
+  val defaultTimeout: Int = 10
+  val defaultMixer: Mixer = Mixer.Linear
+  val defaultIntervalSec: Int = 16
+  val defaultIntervalCount: Int = 512
+  val defaultZookeeperTimeout: Int = 10
+  val defaultInterconnectTimeout: Int = 10
+
+  object Key {
+    case object Thread extends ItemKey("thread")
+    case object Timeout extends ItemKey("timeout")
+    case object Mixer extends ItemKey("mixer")
+    case object IntervalSec extends ItemKey("interval_sec")
+    case object IntervalCount extends ItemKey("interval_count")
+    case object ZookeeperTimeout extends ItemKey("zookeeper_timeout")
+    case object InterconnectTimeout extends ItemKey("interconnect_timeout")
+
+    val keySet = Set(Thread.name, Timeout.name, Mixer.name, IntervalSec.name, IntervalCount.name, ZookeeperTimeout.name, InterconnectTimeout.name)
+  }
+}
+case class ServerConfig(thread: Int = ServerConfig.defaultThread, timeout: Int = ServerConfig.defaultTimeout,
+    mixer: Mixer = ServerConfig.defaultMixer, intervalSec: Int = ServerConfig.defaultIntervalSec,
+    intervalCount: Int = ServerConfig.defaultIntervalCount, zookeeperTimeout: Int = ServerConfig.defaultZookeeperTimeout,
+    interconnectTimeout: Int = ServerConfig.defaultInterconnectTimeout)
+
+object ProxyConfig {
+  val defaultThread: Int = 4
+  val defaultTimeout: Int = 10
+  val defaultZookeeperTimeout: Int = 10
+  val defaultInterconnectTimeout: Int = 10
+  val defaultPoolExpire: Int = 60
+  val defaultPoolSize: Int = 0
+
+  object Key {
+    case object Thread extends ItemKey("thread")
+    case object Timeout extends ItemKey("timeout")
+    case object ZookeeperTimeout extends ItemKey("zookeeper_timeout")
+    case object InterconnectTimeout extends ItemKey("interconnect_timeout")
+    case object PoolExpire extends ItemKey("pool_expire")
+    case object PoolSize extends ItemKey("pool_size")
+
+    val keySet = Set(Thread.name, Timeout.name, ZookeeperTimeout.name, InterconnectTimeout.name, PoolExpire.name, PoolSize.name)
+  }
+}
+case class ProxyConfig(thread: Int = ProxyConfig.defaultThread, timeout: Int = ProxyConfig.defaultTimeout,
+    zookeeperTimeout: Int = ProxyConfig.defaultZookeeperTimeout, interconnectTimeout: Int = ProxyConfig.defaultInterconnectTimeout,
+    poolExpire: Int = ProxyConfig.defaultPoolExpire, poolSize: Int = ProxyConfig.defaultPoolSize)
+
+case class LogConfig(applicationMasterLogConfigPath: Option[String], jubatusProxyLogConfigPath: Option[String], jubatusServerLogConfigPath: Option[String])
+

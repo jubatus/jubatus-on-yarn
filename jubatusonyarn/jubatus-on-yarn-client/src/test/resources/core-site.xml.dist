@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+
+<!--
+  This file is a template file of core-site.xml.
+  A user should replace [value]s in this file to actual values and rename to core-site.xml.
+-->
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://[host]:[port]</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.mapred.groups</name>
+    <value>*</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.mapred.hosts</name>
+    <value>*</value>
+  </property>
+</configuration>
